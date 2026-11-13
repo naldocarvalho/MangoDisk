@@ -34,6 +34,51 @@ pub fn requires_update(current: Option<&str>, minimum: Option<&str>) -> bool {
 }
 
 #[cfg(target_os = "windows")]
+pub fn prepare_host_thread() {
+    use std::ptr;
+    use windows_sys::{
+        core::w,
+        Win32::{
+            Foundation::GetLastError,
+            System::LibraryLoader::GetModuleHandleW,
+            UI::WindowsAndMessaging::{
+                CreateWindowExW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+                WS_EX_TRANSPARENT, WS_POPUP, WS_VISIBLE,
+            },
+        },
+    };
+
+    // Hidden WebView2 windows initialize before any foreground surface is shown.
+    // Endpoint hooks that wrap GetMessageA with PeekMessageA + GetLastError can
+    // fail with ERROR_INVALID_WINDOW_HANDLE (0x80070578) when the UI thread has
+    // no visible top-level window while synchronous script setup pumps the queue.
+    // A zero-size off-screen tool window keeps a valid visible handle on the UI
+    // thread without appearing on screen, in the taskbar, or in focus traversal.
+    let hwnd = unsafe {
+        CreateWindowExW(
+            WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT | WS_EX_LAYERED,
+            w!("Static"),
+            ptr::null(),
+            WS_POPUP | WS_VISIBLE,
+            -32000,
+            -32000,
+            0,
+            0,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            GetModuleHandleW(ptr::null()),
+            ptr::null(),
+        )
+    };
+    if hwnd.is_null() {
+        log::warn!(
+            "webview_runtime_host_window_failed native_code={}",
+            unsafe { GetLastError() }
+        );
+    }
+}
+
+#[cfg(target_os = "windows")]
 pub fn show_update_prompt(app: &tauri::AppHandle) {
     use crate::services::native_labels::NativeLabels;
     use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};

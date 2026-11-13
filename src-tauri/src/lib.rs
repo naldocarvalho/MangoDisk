@@ -383,6 +383,8 @@ pub fn run() {
                 webview_runtime::show_update_prompt(app.handle());
                 return Ok(());
             }
+            #[cfg(target_os = "windows")]
+            webview_runtime::prepare_host_thread();
             configure_core_storage(app)?;
             #[cfg(windows)]
             app.manage(webview_recovery::RecoveryState::default());
