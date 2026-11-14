@@ -47,7 +47,9 @@ pub fn install(app: &tauri::AppHandle) -> tauri::Result<()> {
     taskbar_display::install(app);
     #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     floating_monitor::install(app);
-    tray_display::install(app)?;
+    if let Err(error) = tray_display::install(app) {
+        log::warn!("tray_display_install_failed: {error}");
+    }
     memory_preferences::install(app);
     let preferences = preferences::load(app);
     let state = runtime::start(app, preferences.clone());
@@ -57,7 +59,9 @@ pub fn install(app: &tauri::AppHandle) -> tauri::Result<()> {
         .lock()
         .unwrap_or_else(|error| error.into_inner())
         .clone();
-    tray_display::apply_preferences(app, &preferences, &reading)?;
+    if let Err(error) = tray_display::apply_preferences(app, &preferences, &reading) {
+        log::warn!("tray_display_apply_preferences_failed: {error}");
+    }
     state
         .display_initialized
         .store(true, std::sync::atomic::Ordering::Release);
